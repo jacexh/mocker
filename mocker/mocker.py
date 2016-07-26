@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+from datetime import datetime
 from flask import Flask, request, Response, jsonify
 
 app = Flask(__name__)
@@ -40,12 +41,12 @@ class ResponsePicker(object):
         app.logger.info(request.data)
         if self.mode == 0:
             return self.responses[0]
-        elif self.mode == 1:  # 关键字模式
+        elif self.mode == 1:  # keyword mode
             for response in self.responses:
                 if response.keyword in request.data:
                     return response
             return
-        elif self.mode == 2:  # 正则模式
+        elif self.mode == 2:  # regular mode
             for response in self.responses:
                 p = re.search(response.regular, request.data)
                 if p.group():
@@ -53,6 +54,14 @@ class ResponsePicker(object):
             return
         else:
             return
+
+    @classmethod
+    def create_instance(cls, responses, mode=0):
+        first_response = responses[0]
+        inst = cls(first_response, mode)
+        for response in responses[1:]:
+            inst.receive(response)
+        return inst
 
 
 class ResponsePool(object):
@@ -91,7 +100,7 @@ def main(path):
 
 @app.route("/create", methods=["POST"])
 def create_mocked_response():
-    """
+    """request body:
     {
       "path": "/echo",
       "method": "post",
@@ -129,23 +138,71 @@ def create_mocked_response():
         if not responses:
             return jsonify(msg="empty response")
 
-        mocked_responses = []
-        for response in responses:
-            headers = response.pop("headers", None)
-            content = response.pop("content", "hello world")
-            status_code = response.pop("status_code", 200)
-            mocked_response = MockResponse(path, method, response=content, status=status_code, **response)
-            if headers and isinstance(headers, dict):
-                for k, v in headers.iteritems():
-                    mocked_response.headers[k] = v
-            mocked_responses.append(mocked_response)
+        if generate_response_from_request(path, method, mode, responses):
+            return jsonify(msg="ok")
+        else:
+            return jsonify(msg="unknown error")
 
-        picker = ResponsePicker(mocked_responses[0], mode)
-        for r in mocked_responses[1:]:
-            picker.receive(r)
 
-        pool.register(picker)
-        return jsonify(msg="ok")
+@app.route("/import", methods=['POST'])
+def import_settings():
+    settings = request.get_json()
+    if not settings.get("data", None):
+        return jsonify(msg="import failed")
+
+    for rule in settings['data']:
+        try:
+            path, method, mode, responses = rule['path'], rule['method'], rule['mode'], rule['responses']
+        except KeyError:
+            return jsonify(msg="required field missing")
+        except TypeError:
+            return jsonify(msg="invalid request")
+        else:
+            generate_response_from_request(path, method, mode, responses)
+    return jsonify(msg="ok")
+
+
+@app.route("/export", methods=["GET"])
+def export_settings():
+    settings = {"date": datetime.now(), "data": []}
+
+    for _, picker in pool.pool.iteritems():
+        mode = picker.mode
+        path = None
+        method = None
+        item = {"mode": mode, "path": path, "method": method, "responses": []}
+        for response in picker.responses:
+            if not item['path']:
+                item['path'] = response.path
+            if not item['method']:
+                item['method'] = response.method
+            resp = dict(
+                keyword=response.keyword,
+                regular=response.regular,
+                content=response.response,
+                status_code=response.status_code,
+                content_type=response.content_type,
+                headers={k: v for k, v in response.headers.items()})
+            item['responses'].append(resp)
+        settings['data'].append(item)
+    return jsonify(settings)
+
+
+def generate_response_from_request(path, method, mode, responses):
+    mocked_responses = []
+    for response in responses:
+        headers = response.pop("headers", None)
+        content = response.pop("content", "hello world")
+        status_code = response.pop("status_code", 200)
+        mocked_response = MockResponse(path, method, response=content, status=status_code, **response)
+        if headers and isinstance(headers, dict):
+            for k, v in headers.iteritems():
+                mocked_response.headers[k] = v
+        mocked_responses.append(mocked_response)
+
+    picker = ResponsePicker.create_instance(mocked_responses, mode)
+    pool.register(picker)
+    return True
 
 
 if __name__ == "__main__":
