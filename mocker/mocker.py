@@ -212,7 +212,7 @@ if __name__ == "__main__":
     args.add_argument("--host", dest="host", default="0.0.0.0", type=str, action="store")
     args.add_argument("--port", dest="port", default=8888, type=int, action="store")
 
-    opts = args.parse_known_args()
+    opts, _ = args.parse_known_args()
 
     try:
         from gevent.wsgi import WSGIServer
