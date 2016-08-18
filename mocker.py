@@ -19,7 +19,7 @@ class MockResponse(Response):
 
     @property
     def id(self):
-        return self.path + " | " + self.method
+        return self.method + " | " + self.path
 
 
 class ResponsePicker(object):
@@ -90,7 +90,9 @@ pool.register(default_picker)
 @app.route('/', defaults={'path': ''}, methods=['GET', 'POST', 'UPDATE', 'PATCH', 'OPTIONS'])
 @app.route('/<path:path>', methods=['GET', 'POST', 'UPDATE', 'PATCH', 'OPTIONS'])
 def main(path):
-    rid = "/" + path + " | " + request.method.upper()
+    rid = request.method.upper() + " | /" + path
+    if rid.endswith("/"):
+        rid = rid[:-1]
     app.logger.info(rid)
     response = pool.get_by_id(rid, request)
     if response is None:
