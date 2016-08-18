@@ -90,9 +90,9 @@ pool.register(default_picker)
 @app.route('/', defaults={'path': ''}, methods=['GET', 'POST', 'UPDATE', 'PATCH', 'OPTIONS'])
 @app.route('/<path:path>', methods=['GET', 'POST', 'UPDATE', 'PATCH', 'OPTIONS'])
 def main(path):
+    if path.endswith("/"):
+        path = path[:-1]
     rid = request.method.upper() + " | /" + path
-    if rid.endswith("/"):
-        rid = rid[:-1]
     app.logger.info(rid)
     response = pool.get_by_id(rid, request)
     if response is None:
@@ -146,6 +146,7 @@ def create_mocked_response():
             return jsonify(msg="unknown error")
 
 
+@app.route("/import/", methods=['POST'])
 @app.route("/import", methods=['POST'])
 def import_settings():
     settings = request.get_json()
@@ -164,6 +165,7 @@ def import_settings():
     return jsonify(msg="ok")
 
 
+@app.route("/export/", methods=['GET'])
 @app.route("/export", methods=["GET"])
 def export_settings():
     settings = {"date": datetime.now(), "data": []}
