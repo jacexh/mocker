@@ -37,8 +37,8 @@ class ResponsePicker(object):
             raise ValueError("only receive instance of MockResponse with same id")
         self.responses.append(response)
 
-    def handle(self, request):
-        app.logger.info(request.data)
+    def handle(self, req):
+        app.logger.info(req.data)
         if self.mode == 0:
             return self.responses[0]
         elif self.mode == 1:  # keyword mode
@@ -48,7 +48,7 @@ class ResponsePicker(object):
             return
         elif self.mode == 2:  # regular mode
             for response in self.responses:
-                p = re.search(response.regular, request.data)
+                p = re.search(response.regular, req.data)
                 if p.group():
                     return response
             return
@@ -64,7 +64,7 @@ class ResponsePicker(object):
         return inst
 
 
-class ResponsePool(object):
+class PickerPool(object):
 
     def __init__(self):
         self.pool = dict()
@@ -74,14 +74,14 @@ class ResponsePool(object):
             raise ValueError
         self.pool[picker.id] = picker
 
-    def get_by_id(self, rid, request):
+    def get_by_id(self, rid, req):
         picker = self.pool.get(rid, None)
         if not picker:
             return
-        return picker.handle(request)
+        return picker.handle(req)
 
 
-pool = ResponsePool()
+pool = PickerPool()
 default_response = MockResponse("/", "GET", response="Welcome to mocker!")
 default_picker = ResponsePicker(default_response)
 pool.register(default_picker)
