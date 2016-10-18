@@ -42,13 +42,21 @@ class ResponsePicker(object):
         if self.mode == 0:
             return self.responses[0]
         elif self.mode == 1:  # keyword mode
+            if req.method == 'GET':
+                lookup = req.query_string
+            else:
+                lookup = req.data
             for response in self.responses:
-                if response.keyword in request.data:
+                if response.keyword in lookup:
                     return response
             return
         elif self.mode == 2:  # regular mode
+            if req.method == 'GET':
+                lookup = req.query_string
+            else:
+                lookup = req.data
             for response in self.responses:
-                p = re.search(response.regular, req.data)
+                p = re.search(response.regular, lookup)
                 if p.group():
                     return response
             return
